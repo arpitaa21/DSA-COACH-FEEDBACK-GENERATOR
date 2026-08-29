@@ -48,7 +48,7 @@ appearances.
                   ┌─────────────────────────────────────────────┐
                   │              Code Exec Agent                │
                   │              (LangGraph graph)              │
-User submits ──▶ │   1. read_input        (Gemini Vision OCR)  │
+User submits ──▶  │   1. read_input        (Gemini Vision OCR)   │
  problem +        │   2. execute_code      (Judge0 sandbox)     │
  constraints +    │   3. generate_feedback (Gemini reasoning)   │  ──▶ structured feedback JSON
  code/image      └──────────────────────────────────────────────┘         │
