@@ -23,18 +23,6 @@ complexity — and gets **genuine, specific feedback**, from an agent that
 actually *runs* the code before reviewing it, instead of guessing from
 appearances.
 
-## 📋 Table of Contents
-
-- [Why This Covers the Brief](#-why-this-covers-the-brief)
-- [Architecture](#-architecture)
-- [Project Structure](#-project-structure)
-- [Quick Start](#-quick-start)
-- [Features](#-features)
-- [Auth Flow](#-auth-flow)
-- [Agent Config](#-agent-config)
-- [Tool Config](#%EF%B8%8F-tool-config)
-- [RAG Module](#-rag-module)
-- [Notes on Scope](#-notes-on-scope)
 
 ---
 
