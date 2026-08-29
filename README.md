@@ -234,6 +234,6 @@ GET  /api/rag/evaluate?top_k=3
 
 <div align="center">
 
-Built with 🧠 by **Team Mind Matrix** — GENAICH-010
+**DSA COACH FEEDBACK GENERATOR**
 
 </div>
