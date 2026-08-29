@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  @apply bg-paper-50 text-ink-900 dark:bg-ink-950 dark:text-paper-100 font-sans;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+::selection {
+  @apply bg-amber-400/40;
+}
+
+.panel {
+  @apply bg-white dark:bg-ink-900 border border-paper-200 dark:border-ink-700 rounded-2xl;
+}
+
+.scrollbar-thin::-webkit-scrollbar { width: 8px; height: 8px; }
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  @apply bg-ink-600/40 rounded-full;
+}

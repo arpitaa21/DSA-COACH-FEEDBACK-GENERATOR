@@ -1,0 +1,60 @@
+# config/tools.yaml
+# ------------------
+# Tool configuration and tool settings for DSA Coach's agent - separate from
+# persona (config/agents.yaml). This file is the source of truth for default
+# tool behavior; where a .env variable also exists for the same setting
+# (e.g. CODE_EXECUTOR, GEMINI_MODEL), the .env value wins at runtime - this
+# file only supplies the fallback default when no .env override is set, and
+# documents the full picture (including settings that have no .env
+# equivalent, like chunk size or the RAG data source manifest) in one place.
+
+code_sandbox:
+  provider: judge0          # "judge0" | "piston" - see backend/piston_client.py
+  timeout_seconds: 8
+  supported_languages:
+    - python
+    - java
+    - c
+    - cpp
+    - javascript
+    - typescript
+    - go
+    - rust
+    - csharp
+    - ruby
+    - kotlin
+    - swift
+
+vision_ocr:
+  provider: gemini
+  model: gemini-3.6-flash
+  purpose: >
+    Transcribes code out of an uploaded photo/screenshot before it's run in
+    the sandbox and reviewed - see rag.agent.read_input().
+  max_image_size_mb: 8
+
+rag_retrieval:
+  embedding_model: models/text-embedding-004
+  chunk_size: 800
+  chunk_overlap: 120
+  top_k_default: 3
+  # Every source ingestion.py pulls from when building the index. "markdown"
+  # sources are read directly; "pdf" sources are text-extracted per-page.
+  # The PDF folders below are intentionally empty in this repo - Tech
+  # Interview Handbook and NeetCode/LeetCode content is copyrighted by their
+  # respective authors and isn't bundled here. Drop your own PDF exports (or
+  # ones you have rights to use) into those folders before running ingestion.
+  data_sources:
+    - path: rag/data/knowledge_base
+      type: markdown
+      description: Hand-written DSA pattern notes (two pointers, sliding window, DP, ...)
+    - path: rag/data/pdf/tech_interview_handbook
+      type: pdf
+      description: >
+        Tech Interview Handbook (techinterviewhandbook.org) PDF export - add
+        your own copy here; folder is empty by default.
+    - path: rag/data/pdf/neetcode_leetcode
+      type: pdf
+      description: >
+        NeetCode / LeetCode pattern notes, PDF export - add your own copy
+        here; folder is empty by default.
