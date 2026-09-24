@@ -1,7 +1,7 @@
 """
 agent.py
 --------
-Code Exec Agent — Mind Matrix / GENAICH-010 (DSA Coach - Feedback Generation)
+Code Exec Agent 
 
 Per the group's multi-agent design doc, this node is an "LLM + sandbox tool" agent:
   Reads:  editor_code, rubric.critical_edge_cases

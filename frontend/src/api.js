@@ -1,6 +1,6 @@
 import { authHeaders } from './auth.js'
 
-const BASE = '/api'
+const BASE ='https://dsa-coach-feedback-generator-api.vercel.app/'
 
 export async function fetchLanguages() {
   const res = await fetch(`${BASE}/languages`)

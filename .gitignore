@@ -1,0 +1,24 @@
+# Python
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+*.pyc
+
+# Secrets - never commit these
+backend/.env
+
+# Databases (generated at runtime, per-machine)
+backend/*.db
+backend/**/*.db
+
+# RAG generated index (regenerated via `python -m rag.ingestion`)
+backend/rag/data/index/*.json
+
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+.vscode/
