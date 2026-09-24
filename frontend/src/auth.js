@@ -1,6 +1,8 @@
 const TOKEN_KEY = 'dsa_coach_token'
 const USERNAME_KEY = 'dsa_coach_username'
 
+const BASE = 'https://vercel.app'
+
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY)
 }
