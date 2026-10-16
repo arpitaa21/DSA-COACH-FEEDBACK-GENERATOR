@@ -1,7 +1,6 @@
 # DSA Coach — Feedback Generation
 
 **Group:** Mind Matrix (`GENAICH-010`)
-**Members:** Deep Sikha Baliyarsingh, Taniprava Sahoo, Arpita Panda
 **Domain:** DSA · Generative AI / LLM applications
 **Agent kept from the original architecture:** `Code Exec Agent` (LLM + sandbox tool)
 
