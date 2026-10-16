@@ -54,7 +54,7 @@ export default function FeedbackPanel({ loading, result, error }) {
 
   return (
     <div className="space-y-4">
-      <div className="panel p-5">
+      <div className="panel p-4 sm:p-5">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <span className={`text-xs font-mono px-2.5 py-1 rounded-full border ${VERDICT_STYLE[fb.verdict] || 'bg-ink-100 text-ink-600'}`}>
             {VERDICT_LABEL[fb.verdict] || fb.verdict || 'Unknown'}
@@ -68,7 +68,7 @@ export default function FeedbackPanel({ loading, result, error }) {
       </div>
 
       {testResults.length > 0 && (
-        <div className="panel p-5">
+        <div className="panel p-4 sm:p-5">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-mono uppercase tracking-wider text-ink-600 dark:text-paper-200/50">
               Test cases
@@ -95,7 +95,7 @@ export default function FeedbackPanel({ loading, result, error }) {
         </div>
       )}
 
-      <div className="panel p-5 grid grid-cols-2 gap-4">
+      <div className="panel p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <div>
           <p className="text-xs font-mono uppercase tracking-wider text-ink-600 dark:text-paper-200/50">Actual time</p>
           <p className="font-mono text-lg mt-1">{fb.actual_time_complexity || '—'}</p>
@@ -105,12 +105,12 @@ export default function FeedbackPanel({ loading, result, error }) {
           <p className="font-mono text-lg mt-1">{fb.actual_space_complexity || '—'}</p>
         </div>
         {fb.complexity_notes && (
-          <p className="col-span-2 text-sm text-ink-600 dark:text-paper-200/70">{fb.complexity_notes}</p>
+          <p className="col-span-1 sm:col-span-2 text-sm text-ink-600 dark:text-paper-200/70">{fb.complexity_notes}</p>
         )}
       </div>
 
       {(fb.bugs?.length > 0 || fb.edge_cases_missed?.length > 0) && (
-        <div className="panel p-5">
+        <div className="panel p-4 sm:p-5">
           {fb.bugs?.length > 0 && (
             <>
               <p className="text-xs font-mono uppercase tracking-wider text-coral-400 mb-2">Bugs / risks</p>
@@ -131,7 +131,7 @@ export default function FeedbackPanel({ loading, result, error }) {
       )}
 
       {fb.improvement_suggestions?.length > 0 && (
-        <div className="panel p-5">
+        <div className="panel p-4 sm:p-5">
           <p className="text-xs font-mono uppercase tracking-wider text-teal-500 mb-2">How to improve</p>
           <ul className="text-sm space-y-1.5 list-disc list-inside text-ink-800 dark:text-paper-100">
             {fb.improvement_suggestions.map((s, i) => <li key={i}>{s}</li>)}
@@ -141,15 +141,15 @@ export default function FeedbackPanel({ loading, result, error }) {
 
       {fb.improved_code && (
         <div className="panel overflow-hidden">
-          <p className="text-xs font-mono uppercase tracking-wider px-5 pt-4 text-ink-600 dark:text-paper-200/50">Suggested rewrite</p>
-          <pre className="text-xs font-mono p-5 overflow-x-auto scrollbar-thin">{fb.improved_code}</pre>
+          <p className="text-xs font-mono uppercase tracking-wider px-4 sm:px-5 pt-3.5 sm:pt-4 text-ink-600 dark:text-paper-200/50">Suggested rewrite</p>
+          <pre className="text-xs font-mono p-3.5 sm:p-5 overflow-x-auto scrollbar-thin">{fb.improved_code}</pre>
         </div>
       )}
 
       {(exec.stdout || exec.stderr || exec.compile_stderr) && (
         <div className="panel overflow-hidden">
-          <p className="text-xs font-mono uppercase tracking-wider px-5 pt-4 text-ink-600 dark:text-paper-200/50">Sandbox output</p>
-          <pre className="text-xs font-mono p-5 overflow-x-auto scrollbar-thin whitespace-pre-wrap">
+          <p className="text-xs font-mono uppercase tracking-wider px-4 sm:px-5 pt-3.5 sm:pt-4 text-ink-600 dark:text-paper-200/50">Sandbox output</p>
+          <pre className="text-xs font-mono p-3.5 sm:p-5 overflow-x-auto scrollbar-thin whitespace-pre-wrap">
             {exec.compile_stderr && <span className="text-coral-400">{exec.compile_stderr}\n</span>}
             {exec.stdout}
             {exec.stderr && <span className="text-coral-400">{exec.stderr}</span>}

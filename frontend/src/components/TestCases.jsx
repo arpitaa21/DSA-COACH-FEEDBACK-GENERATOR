@@ -10,12 +10,12 @@ export default function TestCases({ testCases, setTestCases, results }) {
   const removeCase = (i) => setTestCases((tcs) => tcs.filter((_, idx) => idx !== i))
 
   return (
-    <div className="panel p-5">
-      <div className="flex items-center justify-between mb-3">
+    <div className="panel p-4 sm:p-5">
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <h3 className="font-mono font-bold text-sm flex items-center gap-2">
           <span className="text-amber-500">03</span> Test cases <span className="text-ink-600 dark:text-paper-200/40 font-normal">(optional, but recommended)</span>
         </h3>
-        <button onClick={addCase} className="text-xs font-mono text-amber-500 hover:underline">+ add case</button>
+        <button onClick={addCase} className="text-xs font-mono text-amber-500 hover:underline cursor-pointer">+ add case</button>
       </div>
 
       {testCases.length === 0 && (
@@ -40,7 +40,7 @@ export default function TestCases({ testCases, setTestCases, results }) {
                   <button onClick={() => removeCase(i)} className="text-[11px] text-coral-400 hover:underline">remove</button>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <textarea rows={2} className={inputCls} placeholder="stdin input" value={tc.input} onChange={(e) => update(i, 'input', e.target.value)} />
                 <textarea rows={2} className={inputCls} placeholder="expected stdout" value={tc.expected_output} onChange={(e) => update(i, 'expected_output', e.target.value)} />
               </div>

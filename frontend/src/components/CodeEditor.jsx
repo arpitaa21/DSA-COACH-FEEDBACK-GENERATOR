@@ -31,22 +31,34 @@ export default function CodeEditor({ code, setCode, language, setLanguage, langu
 
   return (
     <div className="panel overflow-hidden flex flex-col">
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-paper-200 dark:border-ink-700 bg-paper-100/60 dark:bg-ink-800/60">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between px-3 sm:px-4 py-2 sm:py-2.5 border-b border-paper-200 dark:border-ink-700 bg-paper-100/60 dark:bg-ink-800/60">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-coral-400" />
           <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
           <span className="w-2.5 h-2.5 rounded-full bg-teal-400" />
-          <span className="ml-2 text-xs font-mono text-ink-600 dark:text-paper-200/50">solution.{ext(language)}</span>
+          <span className="ml-1 sm:ml-2 text-xs font-mono text-ink-600 dark:text-paper-200/50">solution.{ext(language)}</span>
         </div>
-        <select
-          value={language}
-          onChange={(e) => setLanguage(e.target.value)}
-          className="text-xs font-mono bg-transparent border border-paper-200 dark:border-ink-600 rounded-md px-2 py-1 focus:outline-none"
-        >
-          {(languages.length ? languages : Object.keys(LANGUAGE_LABELS)).map((l) => (
-            <option key={l} value={l}>{LANGUAGE_LABELS[l] || l}</option>
-          ))}
-        </select>
+        <div className="relative inline-flex items-center">
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            style={{ colorScheme: isDark ? 'dark' : 'light' }}
+            className="text-xs font-mono bg-paper-50 dark:bg-ink-900 text-ink-900 dark:text-paper-100 border border-paper-200 dark:border-ink-600 rounded-md pl-2.5 pr-6 py-1 focus:outline-none focus:ring-2 focus:ring-amber-400/60 appearance-none cursor-pointer transition-colors shadow-sm"
+          >
+            {(languages.length ? languages : Object.keys(LANGUAGE_LABELS)).map((l) => (
+              <option
+                key={l}
+                value={l}
+                className="bg-white dark:bg-ink-900 text-ink-900 dark:text-paper-100 py-1"
+              >
+                {LANGUAGE_LABELS[l] || l}
+              </option>
+            ))}
+          </select>
+          <div className="pointer-events-none absolute right-2 text-ink-600 dark:text-paper-200/50 text-[10px] select-none">
+            ▾
+          </div>
+        </div>
       </div>
 
       <CodeMirror

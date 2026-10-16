@@ -20,12 +20,12 @@ export default function StreakTracker({ heatmap, currentStreak, totals }) {
   }
 
   return (
-    <div className="panel p-5">
+    <div className="panel p-4 sm:p-5">
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <h3 className="font-mono font-bold text-sm flex items-center gap-2">
           <span className="text-amber-500">04</span> Daily practice streak
         </h3>
-        <div className="flex items-center gap-4 text-xs font-mono text-ink-600 dark:text-paper-200/60">
+        <div className="flex items-center flex-wrap gap-2 sm:gap-4 text-xs font-mono text-ink-600 dark:text-paper-200/60">
           <span>🔥 {currentStreak}-day streak</span>
           <span>{totals?.solved ?? 0} solved / {totals?.attempted ?? 0} attempted (6 mo)</span>
         </div>
@@ -45,7 +45,7 @@ export default function StreakTracker({ heatmap, currentStreak, totals }) {
         ))}
       </div>
 
-      <div className="flex items-center gap-4 mt-3 text-[11px] text-ink-600 dark:text-paper-200/40">
+      <div className="flex items-center flex-wrap gap-3 sm:gap-4 mt-3 text-[11px] text-ink-600 dark:text-paper-200/40">
         <span className="flex items-center gap-1.5"><span className="w-[10px] h-[10px] rounded-sm bg-amber-400/35 inline-block" /> attempted, not solved</span>
         <span className="flex items-center gap-1.5"><span className="w-[10px] h-[10px] rounded-sm bg-teal-400 inline-block" /> solved</span>
       </div>

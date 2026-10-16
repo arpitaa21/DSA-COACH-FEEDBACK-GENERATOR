@@ -17,7 +17,7 @@ export default function ProblemForm({ form, setForm }) {
   const update = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
   return (
-    <div className="panel p-5">
+    <div className="panel p-4 sm:p-5">
       <h2 className="font-mono font-bold text-sm mb-4 flex items-center gap-2">
         <span className="text-amber-500">01</span> Problem setup
       </h2>
@@ -42,7 +42,7 @@ export default function ProblemForm({ form, setForm }) {
         />
       </Field>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Your claimed time complexity">
           <input className={inputCls} placeholder="O(n)" value={form.claimedTimeComplexity} onChange={update('claimedTimeComplexity')} />
         </Field>
