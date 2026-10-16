@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import Header from './components/Header.jsx'
-import Login from './components/Login.jsx'
 import ProblemForm from './components/ProblemForm.jsx'
 import CodeEditor from './components/CodeEditor.jsx'
 import ImageUpload from './components/ImageUpload.jsx'
@@ -8,7 +7,6 @@ import TestCases from './components/TestCases.jsx'
 import FeedbackPanel from './components/FeedbackPanel.jsx'
 import StreakTracker from './components/StreakTracker.jsx'
 import { analyzeSubmission, fetchLanguages, fetchStreak } from './api.js'
-import { getToken, getStoredUsername, logout as clearSession } from './auth.js'
 
 export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark')
@@ -80,13 +78,9 @@ export default function App() {
     }
   }
 
-  if (!username) {
-    return <Login theme={theme} setTheme={setTheme} onAuthed={setUsername} />
-  }
-
   return (
     <div className="min-h-screen">
-      <Header theme={theme} setTheme={setTheme} username={username} onLogout={handleLogout} />
+     <Header theme={theme} setTheme={setTheme} />
 
       <main className="max-w-7xl mx-auto px-6 md:px-10 py-8">
         <div className="mb-6">
