@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Header from './components/Header.jsx'
+import Login from './components/Login.jsx'
 import ProblemForm from './components/ProblemForm.jsx'
 import CodeEditor from './components/CodeEditor.jsx'
 import ImageUpload from './components/ImageUpload.jsx'
@@ -7,6 +8,7 @@ import TestCases from './components/TestCases.jsx'
 import FeedbackPanel from './components/FeedbackPanel.jsx'
 import StreakTracker from './components/StreakTracker.jsx'
 import { analyzeSubmission, fetchLanguages, fetchStreak } from './api.js'
+import { getToken, getStoredUsername, logout as clearSession, fetchCurrentUser } from './auth.js'
 
 export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark')
@@ -34,6 +36,21 @@ export default function App() {
     localStorage.setItem('theme', theme)
   }, [theme])
 
+  // Validate session on app launch
+  useEffect(() => {
+    if (getToken()) {
+      fetchCurrentUser().then((user) => {
+        if (!user) {
+          handleLogout()
+        } else {
+          setUsername(user.username)
+        }
+      }).catch(() => {
+        handleLogout()
+      })
+    }
+  }, [])
+
   useEffect(() => {
     fetchLanguages().then((d) => setLanguages(d.languages || [])).catch(() => {})
   }, [])
@@ -43,7 +60,13 @@ export default function App() {
   }, [username])
 
   function refreshStreak() {
-    fetchStreak().then(setStreak).catch(() => {})
+    fetchStreak()
+      .then(setStreak)
+      .catch((err) => {
+        if (err.status === 401) {
+          handleLogout()
+        }
+      })
   }
 
   function handleLogout() {
@@ -72,28 +95,35 @@ export default function App() {
       if (data.extracted_code) setCode(data.extracted_code)
       refreshStreak() // pulls the freshly-logged solve into today's box immediately
     } catch (e) {
+      if (e.status === 401) {
+        handleLogout()
+      }
       setError(e.message || 'Something went wrong talking to the Code Exec Agent.')
     } finally {
       setLoading(false)
     }
   }
 
+  if (!username) {
+    return <Login theme={theme} setTheme={setTheme} onAuthed={setUsername} />
+  }
+
   return (
     <div className="min-h-screen">
-     <Header theme={theme} setTheme={setTheme} />
+      <Header theme={theme} setTheme={setTheme} username={username} onLogout={handleLogout} />
 
-      <main className="max-w-7xl mx-auto px-6 md:px-10 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 md:px-10 py-5 sm:py-8">
         <div className="mb-6">
-          <h1 className="font-mono text-2xl md:text-3xl font-extrabold tracking-tight">
+          <h1 className="font-mono text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight">
             Get honest feedback on your DSA solution
           </h1>
-          <p className="text-sm text-ink-600 dark:text-paper-200/60 mt-1">
+          <p className="text-xs sm:text-sm text-ink-600 dark:text-paper-200/60 mt-1">
             Type or upload your code, describe the problem, and the Code Exec Agent will
             run it in a real sandbox and review it like a strict interviewer would.
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="space-y-6">
             <ProblemForm form={form} setForm={setForm} />
             <ImageUpload imageFile={imageFile} setImageFile={setImageFile} />
@@ -111,7 +141,7 @@ export default function App() {
             <button
               onClick={handleSubmit}
               disabled={loading || (!code.trim() && !imageFile)}
-              className="w-full py-3 rounded-xl font-mono font-bold text-sm bg-ink-900 text-amber-400 dark:bg-amber-400 dark:text-ink-950 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+              className="w-full py-3 rounded-xl font-mono font-bold text-sm bg-ink-900 text-amber-400 dark:bg-amber-400 dark:text-ink-950 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity cursor-pointer shadow-sm"
             >
               {loading ? 'Running Code Exec Agent…' : 'Get feedback →'}
             </button>
@@ -128,8 +158,8 @@ export default function App() {
         </div>
       </main>
 
-      <footer className="max-w-7xl mx-auto px-6 md:px-10 py-6 text-xs text-ink-600/60 dark:text-paper-200/30 font-mono">
-        DSA Coach — Feedback Generation · Mind Matrix (GENAICH-010) · Code Exec Agent · Gemini + LangGraph + Piston sandbox
+      <footer className="max-w-7xl mx-auto px-4 sm:px-6 md:px-10 py-5 sm:py-6 text-xs text-ink-600/60 dark:text-paper-200/30 font-mono text-center sm:text-left">
+        DSA Coach — Feedback Generation · Mind Matrix · Created by ARPITA PANDA
       </footer>
     </div>
   )
