@@ -18,15 +18,17 @@ try:
     )
 except Exception:
     _DEFAULT_EMBEDDING_MODEL = "models/gemini-embedding-001"
+
 EMBEDDING_MODEL = os.getenv("RAG_EMBEDDING_MODEL", _DEFAULT_EMBEDDING_MODEL)
 
+# gemini-embedding-001 returns 3072-dim vectors by default (it supports scaling
+# down via Matryoshka Representation Learning, but we keep the default here
+# for simplicity). This constant is informational only - indexing.py doesn't
+# hardcode a dimension, it just uses whatever length comes back.
+EMBEDDING_DIM = 3072
 
-# Gemini's text-embedding-004 returns 768-dim vectors - kept here as the
-# expected dimension for sanity checks in indexing.py / evaluation.py.
-EMBEDDING_DIM = 768
-
-_MAX_RETRIES = 5
-_RETRY_DELAY_SECONDS = 15
+_MAX_RETRIES = 3
+_RETRY_DELAY_SECONDS = 2
 
 
 def _configure_gemini():
@@ -57,14 +59,8 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
     tells the model these are documents to be searched over, not the search
     query itself - Gemini's embeddings are asymmetric between the two)."""
     _configure_gemini()
-    results = []
-    total = len(texts)
-    for i, t in enumerate(texts, 1):
-        results.append(_embed_one(t, task_type="retrieval_document"))
-        time.sleep(1)  # stay under the free-tier requests-per-minute limit
-        if i % 10 == 0 or i == total:
-            print(f"  embedded {i}/{total} chunks...")
-    return results
+    return [_embed_one(t, task_type="retrieval_document") for t in texts]
+
 
 def embed_query(text: str) -> list[float]:
     """Embeds a single search query (task_type='retrieval_query')."""

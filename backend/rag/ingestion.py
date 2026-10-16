@@ -14,9 +14,6 @@ endpoint in main.py).
 
 import time
 
-from dotenv import load_dotenv
-load_dotenv()
-
 from .loaders import load_documents, load_all_sources
 from .chunking import chunk_documents
 from .embeddings import embed_texts

@@ -18,10 +18,8 @@ Run it directly:
 (Assumes ingestion has already been run at least once - it loads the saved
 index rather than rebuilding it.)
 """
-from dataclasses import dataclass
 
-from dotenv import load_dotenv
-load_dotenv()
+from dataclasses import dataclass
 
 from .embeddings import embed_query
 from .indexing import VectorIndex
