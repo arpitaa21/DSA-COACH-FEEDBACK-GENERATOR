@@ -9,9 +9,8 @@ httpx==0.27.2
 pydantic==2.9.2
 python-dotenv==1.0.1
 Pillow==10.4.0
-PyJWT==2.9.0
-passlib[bcrypt]==1.7.4
-bcrypt==4.2.0
+PyJWT>=2.9.0
+bcrypt>=4.2.0
 numpy>=1.26
 PyYAML==6.0.2
 pypdf==5.1.0

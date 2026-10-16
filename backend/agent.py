@@ -1,7 +1,7 @@
 """
 agent.py
 --------
-Code Exec Agent 
+Code Exec Agent — Mind Matrix / GENAICH-010 (DSA Coach - Feedback Generation)
 
 Per the group's multi-agent design doc, this node is an "LLM + sandbox tool" agent:
   Reads:  editor_code, rubric.critical_edge_cases
@@ -74,12 +74,21 @@ class AgentState(TypedDict, total=False):
     feedback: dict
 
 
+def is_demo_mode() -> bool:
+    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    return os.getenv("DEMO_MODE", "false").lower() in ("true", "1") or api_key.lower() == "demo"
+
+
 # ---------------------------------------------------------------------------
 # Node 1: pull code out of an uploaded image, if the user submitted one instead
 # of / in addition to typing it in.
 # ---------------------------------------------------------------------------
 def read_input(state: AgentState) -> AgentState:
     if not state.get("image_b64"):
+        return state
+
+    if is_demo_mode():
+        state["code"] = "# [Demo Mode] Transcribed code placeholder\ndef solution():\n    pass"
         return state
 
     _configure_gemini()

@@ -1,12 +1,19 @@
 """
 config_loader.py
 -----------------
-Loads agent persona config (role / goal / backstory) from config/agents.yaml.
+Loads agent persona config (role / goal / backstory) from config/agents.yaml,
+and tool config from config/tools.yaml.
 
-Kept as a tiny standalone module - rather than inlining a yaml.safe_load()
-call in agent.py - so any future agent (or a real CrewAI Agent, if the project
-grows into that) can load its config from the same file the same way.
+Also loads backend/.env here, at the top of this file - this module is
+imported first (directly or transitively) by everything else in the backend
+(agent.py, main.py, piston_client.py, every rag/*.py module), so doing it
+here guarantees .env is read before any module's top-level code tries to
+read an environment variable, regardless of which module happens to get
+imported first. (Putting load_dotenv() only in main.py, or only in one rag
+module, isn't enough - Python can import other modules, like rag/embeddings.py,
+before that call ever runs, e.g. via rag/__init__.py's import order.)
 """
+
 from functools import lru_cache
 from pathlib import Path
 

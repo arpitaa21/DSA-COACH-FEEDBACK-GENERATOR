@@ -50,6 +50,7 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 class RegisterRequest(BaseModel):
     username: str
+    email: str
     password: str
     display_name: Optional[str] = None
 
@@ -61,7 +62,15 @@ class LoginRequest(BaseModel):
 
 class AuthResponse(BaseModel):
     access_token: str
+    token_type: str = "bearer"
     username: str
+    email: str
+    display_name: str
+
+
+class UserProfileResponse(BaseModel):
+    username: str
+    email: str
     display_name: str
 
 
@@ -69,20 +78,31 @@ async def get_current_username(authorization: Optional[str] = Header(None)) -> s
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Not authenticated. Please log in.")
     token = authorization.split(" ", 1)[1]
-    username = auth.decode_access_token(token)
-    if not username:
+    payload = auth.decode_access_token(token)
+    if not payload or not payload.get("sub"):
         raise HTTPException(status_code=401, detail="Session expired. Please log in again.")
-    return username
+    return payload["sub"]
 
 
 @app.post("/api/register", response_model=AuthResponse)
 def register(payload: RegisterRequest):
     try:
-        user = auth.create_user(payload.username, payload.password, payload.display_name)
+        user = auth.create_user(
+            username=payload.username,
+            email=payload.email,
+            password=payload.password,
+            display_name=payload.display_name,
+        )
     except auth.AuthError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    token = auth.create_access_token(user["username"])
-    return {"access_token": token, "username": user["username"], "display_name": user["display_name"]}
+    token = auth.create_access_token(user)
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "username": user["username"],
+        "email": user["email"],
+        "display_name": user["display_name"],
+    }
 
 
 @app.post("/api/login", response_model=AuthResponse)
@@ -91,8 +111,22 @@ def login(payload: LoginRequest):
         user = auth.verify_user(payload.username, payload.password)
     except auth.AuthError as exc:
         raise HTTPException(status_code=401, detail=str(exc))
-    token = auth.create_access_token(user["username"])
-    return {"access_token": token, "username": user["username"], "display_name": user["display_name"]}
+    token = auth.create_access_token(user)
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "username": user["username"],
+        "email": user["email"],
+        "display_name": user["display_name"],
+    }
+
+
+@app.get("/api/me", response_model=UserProfileResponse)
+def get_me(username: str = Depends(get_current_username)):
+    user = auth.get_user_by_username(username)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    return user
 
 
 @app.get("/api/languages")
@@ -140,17 +174,36 @@ async def analyze(
     except json.JSONDecodeError:
         test_cases = []
 
-    result = await run_code_exec_agent(
-        language=language,
-        problem_statement=problem_statement,
-        constraints=constraints,
-        claimed_time_complexity=claimed_time_complexity,
-        claimed_space_complexity=claimed_space_complexity,
-        code=code,
-        stdin=stdin,
-        test_cases=test_cases,
-        image_b64=image_b64,
-    )
+    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if not api_key or api_key == "your_gemini_api_key_here":
+        raise HTTPException(
+            status_code=400,
+            detail="Gemini API Key is missing or using placeholder in backend/.env. Please set GEMINI_API_KEY in backend/.env with your key from https://aistudio.google.com/apikey",
+        )
+
+    try:
+        result = await run_code_exec_agent(
+            language=language,
+            problem_statement=problem_statement,
+            constraints=constraints,
+            claimed_time_complexity=claimed_time_complexity,
+            claimed_space_complexity=claimed_space_complexity,
+            code=code,
+            stdin=stdin,
+            test_cases=test_cases,
+            image_b64=image_b64,
+        )
+    except Exception as exc:
+        err_str = str(exc)
+        if "API key not valid" in err_str or "API_KEY_INVALID" in err_str:
+            raise HTTPException(
+                status_code=400,
+                detail="Your GEMINI_API_KEY in backend/.env is invalid. Please verify and update it with a valid key from https://aistudio.google.com/apikey",
+            )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Agent analysis error: {err_str}",
+        )
 
     # one solve attempt logged for the streak tracker - tied to the real
     # authenticated user, so streaks can never leak between accounts.
