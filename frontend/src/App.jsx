@@ -77,17 +77,31 @@ export default function App() {
   }
 
   async function handleSubmit() {
+    // 1. Client-side input validation before contacting the agent
+    const cleanProblem = form.problemStatement.trim()
+    const cleanCode = code.trim()
+
+    if (!cleanProblem) {
+      setError('Please provide a problem statement so the coach knows what algorithm to evaluate.')
+      return
+    }
+
+    if (!cleanCode && !imageFile) {
+      setError('Please enter your solution code in the editor or upload an image of your code.')
+      return
+    }
+
     setLoading(true)
     setError(null)
     setResult(null)
     try {
       const data = await analyzeSubmission({
         language,
-        problemStatement: form.problemStatement,
-        constraints: form.constraints,
-        claimedTimeComplexity: form.claimedTimeComplexity,
-        claimedSpaceComplexity: form.claimedSpaceComplexity,
-        code,
+        problemStatement: cleanProblem,
+        constraints: form.constraints.trim(),
+        claimedTimeComplexity: form.claimedTimeComplexity.trim(),
+        claimedSpaceComplexity: form.claimedSpaceComplexity.trim(),
+        code: cleanCode,
         imageFile,
         testCases,
       })
@@ -95,7 +109,8 @@ export default function App() {
       if (data.extracted_code) setCode(data.extracted_code)
       refreshStreak() // pulls the freshly-logged solve into today's box immediately
     } catch (e) {
-      if (e.status === 401) {
+      // Only logout if the user's JWT login session expired, NOT on Gemini API key errors
+      if (e.status === 401 && (e.message?.includes('Not authenticated') || e.message?.includes('Session expired'))) {
         handleLogout()
       }
       setError(e.message || 'Something went wrong talking to the Code Exec Agent.')

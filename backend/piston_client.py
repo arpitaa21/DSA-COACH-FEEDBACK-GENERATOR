@@ -62,10 +62,10 @@ async def _run_judge0(language: str, source_code: str, stdin: str) -> dict:
             "error": f"Language '{language}' isn't wired up for execution yet. "
                      f"Feedback will still be generated from static analysis.",
         }
-    if not JUDGE0_API_KEY:
+    if not JUDGE0_API_KEY or JUDGE0_API_KEY.strip() in ("", "your_rapidapi_key_here"):
         return {
             "ran": False, "stdout": "", "stderr": "", "compile_stderr": None, "signal": None,
-            "error": "JUDGE0_API_KEY is not set in backend/.env - see README for how to get a free key.",
+            "error": "JUDGE0_API_KEY is using a placeholder in backend/.env. Static analysis review will proceed.",
         }
 
     headers = {

@@ -27,7 +27,7 @@ code_sandbox:
 
 vision_ocr:
   provider: gemini
-  model: gemini-3.6-flash
+  model: gemini-2.0-flash
   purpose: >
     Transcribes code out of an uploaded photo/screenshot before it's run in
     the sandbox and reviewed - see rag.agent.read_input().

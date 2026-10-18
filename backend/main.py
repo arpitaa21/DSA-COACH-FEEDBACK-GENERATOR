@@ -15,11 +15,18 @@ FastAPI app exposing:
 
 import base64
 import json
+import logging
 import os
 from typing import Optional
 
 from dotenv import load_dotenv
 load_dotenv()
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger("dsa_coach.main")
 
 from fastapi import FastAPI, Form, File, UploadFile, Header, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,8 +36,6 @@ from agent import run_code_exec_agent
 from piston_client import LANGUAGE_MAP
 import streak_db
 import auth
-from rag.ingestion import run_ingestion
-from rag.evaluation import evaluate_retrieval
 from config_loader import load_agent_config, load_tools_config
 
 app = FastAPI(title="DSA Coach - Feedback Generation API")
@@ -162,48 +167,103 @@ async def analyze(
     image: Optional[UploadFile] = File(None),
     username: str = Depends(get_current_username),
 ):
+    # 1. UI Input Validation - catch empty/malformed inputs before hitting the agent
+    clean_code = code.strip()
+    clean_problem = problem_statement.strip()
+    clean_constraints = constraints.strip()
+
+    if not clean_code and image is None:
+        logger.warning("Analyze rejected for user '%s': no code or image submitted.", username)
+        raise HTTPException(
+            status_code=400,
+            detail="Code solution is required. Please type your code in the editor or upload an image.",
+        )
+
+    if not clean_problem:
+        logger.warning("Analyze rejected for user '%s': empty problem statement.", username)
+        raise HTTPException(
+            status_code=400,
+            detail="Problem statement is required so the coach can evaluate your solution's correctness.",
+        )
+
+    if not clean_constraints:
+        logger.info("User '%s' submitted without explicit constraints.", username)
+
     image_b64 = None
     if image is not None:
-        raw = await image.read()
-        image_b64 = base64.b64encode(raw).decode("utf-8")
+        try:
+            raw = await image.read()
+            image_b64 = base64.b64encode(raw).decode("utf-8")
+        except Exception as img_err:
+            logger.error("Failed to read uploaded image for user '%s': %s", username, img_err)
+            raise HTTPException(
+                status_code=400,
+                detail=f"Uploaded image could not be processed: {img_err}",
+            )
 
     try:
         test_cases = json.loads(test_cases_json) if test_cases_json else []
         if not isinstance(test_cases, list):
             test_cases = []
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as json_err:
+        logger.warning("Malformed test_cases_json for user '%s': %s", username, json_err)
         test_cases = []
 
+    # 2. Check API Key & Demo Mode configuration
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
-    if not api_key or api_key == "your_gemini_api_key_here":
+    demo_mode = os.getenv("DEMO_MODE", "false").lower() in ("true", "1") or api_key.lower() == "demo"
+    if not demo_mode and (not api_key or api_key == "your_gemini_api_key_here"):
+        logger.warning("Analyze rejected: GEMINI_API_KEY missing or placeholder.")
         raise HTTPException(
-            status_code=400,
-            detail="Gemini API Key is missing or using placeholder in backend/.env. Please set GEMINI_API_KEY in backend/.env with your key from https://aistudio.google.com/apikey",
+            status_code=401,
+            detail="Gemini API Key is missing or using placeholder in backend/.env. Please set GEMINI_API_KEY with your key from https://aistudio.google.com/apikey, or enable DEMO_MODE=true in backend/.env for local evaluation.",
         )
+
+    logger.info("Executing Code Exec Agent for user '%s' [lang=%s, code_len=%d, tests=%d]", username, language, len(clean_code), len(test_cases))
 
     try:
         result = await run_code_exec_agent(
             language=language,
-            problem_statement=problem_statement,
-            constraints=constraints,
+            problem_statement=clean_problem,
+            constraints=clean_constraints,
             claimed_time_complexity=claimed_time_complexity,
             claimed_space_complexity=claimed_space_complexity,
-            code=code,
+            code=clean_code,
             stdin=stdin,
             test_cases=test_cases,
             image_b64=image_b64,
         )
     except Exception as exc:
+        # Full traceback logging on server console/logs
+        logger.exception("Agent execution failed for user '%s': %s", username, exc)
         err_str = str(exc)
-        if "API key not valid" in err_str or "API_KEY_INVALID" in err_str:
+
+        # Map to descriptive, actionable HTTP responses instead of generic agent error
+        if any(tok in err_str for tok in ("API key not valid", "API_KEY_INVALID", "UNAUTHENTICATED", "ACCESS_TOKEN_TYPE_UNSUPPORTED")):
             raise HTTPException(
-                status_code=400,
-                detail="Your GEMINI_API_KEY in backend/.env is invalid. Please verify and update it with a valid key from https://aistudio.google.com/apikey",
+                status_code=401,
+                detail="Your GEMINI_API_KEY in backend/.env is invalid or unsupported. Verify and update it with a valid key from https://aistudio.google.com/apikey (keys typically start with 'AIzaSy...'), or set DEMO_MODE=true in backend/.env.",
             )
-        raise HTTPException(
-            status_code=500,
-            detail=f"Agent analysis error: {err_str}",
-        )
+        elif "404" in err_str or "not found" in err_str.lower():
+            raise HTTPException(
+                status_code=404,
+                detail=f"The configured Gemini model was not found ({err_str}). Verify GEMINI_MODEL in backend/.env (recommend 'gemini-2.0-flash' or 'gemini-1.5-flash').",
+            )
+        elif any(tok in err_str for tok in ("429", "RESOURCE_EXHAUSTED", "quota")):
+            raise HTTPException(
+                status_code=429,
+                detail="Gemini API rate limit or quota exceeded. Please wait a moment before trying again, or check your quota at https://aistudio.google.com.",
+            )
+        elif "timeout" in err_str.lower():
+            raise HTTPException(
+                status_code=504,
+                detail="Sandbox or LLM execution timed out. Please simplify your solution or test cases and retry.",
+            )
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Agent analysis encountered an unexpected error: {err_str}. Full traceback has been logged on the server.",
+            )
 
     # one solve attempt logged for the streak tracker - tied to the real
     # authenticated user, so streaks can never leak between accounts.
@@ -220,28 +280,27 @@ async def analyze(
 @app.post("/api/rag/ingest")
 def rag_ingest():
     """Rebuilds the local DSA knowledge-base index: loaders -> chunking ->
-    embeddings -> indexing. Not tied to any user - this is a maintenance/setup
-    operation, run it once after cloning (or after editing the knowledge base
-    files in backend/rag/data/knowledge_base/)."""
+    embeddings -> indexing."""
     try:
+        from rag.ingestion import run_ingestion
         stats = run_ingestion()
     except Exception as exc:
+        logger.exception("RAG ingestion failed: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
     return stats
 
 
 @app.get("/api/rag/evaluate")
 def rag_evaluate(top_k: Optional[int] = None):
-    """Runs the retrieval-quality evaluation (hit-rate@k, MRR, avg similarity)
-    against the small gold query set in rag/evaluation.py. Requires ingestion
-    to have been run at least once. If top_k isn't given, uses
-    rag_retrieval.top_k_default from config/tools.yaml."""
+    """Runs the retrieval-quality evaluation against the gold query set."""
     try:
+        from rag.evaluation import evaluate_retrieval
         k = top_k or int(load_tools_config().get("rag_retrieval", {}).get("top_k_default", 3))
         report = evaluate_retrieval(top_k=k)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
+        logger.exception("RAG evaluation failed: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
     return report
 

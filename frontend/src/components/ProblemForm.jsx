@@ -1,8 +1,8 @@
-function Field({ label, children }) {
+function Field({ label, required, children }) {
   return (
     <label className="block mb-4">
       <span className="block text-xs font-mono uppercase tracking-wider text-ink-600 dark:text-paper-200/60 mb-1.5">
-        {label}
+        {label} {required && <span className="text-amber-500 font-bold">*</span>}
       </span>
       {children}
     </label>
@@ -22,7 +22,7 @@ export default function ProblemForm({ form, setForm }) {
         <span className="text-amber-500">01</span> Problem setup
       </h2>
 
-      <Field label="Problem statement">
+      <Field label="Problem statement" required>
         <textarea
           rows={3}
           className={inputCls}
@@ -30,6 +30,11 @@ export default function ProblemForm({ form, setForm }) {
           value={form.problemStatement}
           onChange={update('problemStatement')}
         />
+        {!form.problemStatement.trim() && (
+          <span className="text-[11px] font-mono text-ink-500 dark:text-paper-200/40 mt-1 block">
+            Required so the coach can evaluate your solution's correctness.
+          </span>
+        )}
       </Field>
 
       <Field label="Constraints">
