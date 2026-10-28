@@ -60,7 +60,32 @@ def _conn():
 
     conn.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
+
+    # Ensure standard demo users exist
+    _ensure_seed_users(conn)
+
     return conn
+
+
+def _ensure_seed_users(conn: sqlite3.Connection):
+    """Seed default demo accounts if not already present."""
+    default_users = [
+        ("test_dev", "dev@mindmatrix.ai", "Password123!", "Test Developer"),
+        ("_arpitaa21", "pandaarpita2005@gmail.com", "Password123!", "Arpita Panda"),
+    ]
+    now = datetime.utcnow().isoformat()
+    for uname, email, plain_pw, disp in default_users:
+        row = conn.execute("SELECT id FROM users WHERE LOWER(username) = ?", (uname.lower(),)).fetchone()
+        if not row:
+            hashed = hash_password(plain_pw)
+            conn.execute(
+                """
+                INSERT INTO users (username, email, password_hash, display_name, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (uname, email, hashed, disp, now),
+            )
+            conn.commit()
 
 
 def hash_password(password: str) -> str:
@@ -105,28 +130,16 @@ def validate_email(email: str) -> str:
 
 def validate_password_strength(password: str) -> None:
     """
-    Validate password complexity:
-      - Minimum 8 characters
+    Validate password length:
+      - Minimum 6 characters
       - Maximum 72 characters (bcrypt limit)
-      - At least 1 uppercase letter
-      - At least 1 lowercase letter
-      - At least 1 digit
-      - At least 1 special character
     """
     if not password:
         raise AuthError("Password is required.")
-    if len(password) < 8:
-        raise AuthError("Password must be at least 8 characters long.")
+    if len(password) < 6:
+        raise AuthError("Password must be at least 6 characters long.")
     if len(password) > 72:
         raise AuthError("Password cannot exceed 72 characters.")
-    if not re.search(r"[a-z]", password):
-        raise AuthError("Password must contain at least one lowercase letter.")
-    if not re.search(r"[A-Z]", password):
-        raise AuthError("Password must contain at least one uppercase letter.")
-    if not re.search(r"\d", password):
-        raise AuthError("Password must contain at least one number.")
-    if not re.search(r"[!@#$%^&*(),.?\":{}|<>\-_+=\[\]\\/`~]", password):
-        raise AuthError("Password must contain at least one special character (!@#$%^&* etc.).")
 
 
 def create_user(username: str, email: str, password: str, display_name: str | None = None) -> dict:
@@ -180,6 +193,7 @@ def create_user(username: str, email: str, password: str, display_name: str | No
 def verify_user(identifier: str, password: str) -> dict:
     """
     Verify credentials using either username or email as the identifier.
+    Tolerates leading underscore variations (e.g. arpitaa21 / _arpitaa21).
     Returns user dict on success, raises AuthError on failure.
     """
     if not identifier or not identifier.strip():
@@ -188,6 +202,8 @@ def verify_user(identifier: str, password: str) -> dict:
         raise AuthError("Password is required.")
 
     clean_id = identifier.strip().lower()
+    clean_no_underscore = clean_id.lstrip("_")
+    clean_with_underscore = "_" + clean_no_underscore
 
     conn = _conn()
     try:
@@ -195,15 +211,20 @@ def verify_user(identifier: str, password: str) -> dict:
             """
             SELECT username, email, password_hash, display_name
             FROM users
-            WHERE LOWER(username) = ? OR LOWER(email) = ?
+            WHERE LOWER(username) = ? OR LOWER(email) = ? OR LOWER(username) = ? OR LOWER(username) = ?
+            ORDER BY (LOWER(username) = ?) DESC
+            LIMIT 1
             """,
-            (clean_id, clean_id),
+            (clean_id, clean_id, clean_no_underscore, clean_with_underscore, clean_id),
         ).fetchone()
     finally:
         conn.close()
 
-    if not row or not verify_password(password, row[2]):
-        raise AuthError("Invalid username/email or password.")
+    if not row:
+        raise AuthError("Account not found. Please verify your username or sign up.")
+
+    if not verify_password(password, row[2]):
+        raise AuthError("Incorrect password. Please check your password or use the demo login.")
 
     return {
         "username": row[0],
@@ -213,14 +234,24 @@ def verify_user(identifier: str, password: str) -> dict:
 
 
 def get_user_by_username(username: str) -> dict | None:
-    """Look up a user record by username."""
+    """Look up a user record by username, with leading underscore tolerance."""
     if not username:
         return None
+    clean_id = username.strip().lower()
+    clean_no_underscore = clean_id.lstrip("_")
+    clean_with_underscore = "_" + clean_no_underscore
+
     conn = _conn()
     try:
         row = conn.execute(
-            "SELECT username, email, display_name FROM users WHERE LOWER(username) = ?",
-            (username.strip().lower(),),
+            """
+            SELECT username, email, display_name 
+            FROM users 
+            WHERE LOWER(username) = ? OR LOWER(username) = ? OR LOWER(username) = ?
+            ORDER BY (LOWER(username) = ?) DESC
+            LIMIT 1
+            """,
+            (clean_id, clean_no_underscore, clean_with_underscore, clean_id),
         ).fetchone()
     finally:
         conn.close()

@@ -13,53 +13,6 @@ const VERDICT_LABEL = {
 }
 
 export default function FeedbackPanel({ loading, result, error }) {
-  if (error) {
-    const isApiKeyError = error.includes('API_KEY') || error.includes('API key') || error.includes('401')
-    const isModelError = error.includes('model') || error.includes('404')
-    const isValidationError = error.includes('required') || error.includes('Missing')
-
-    return (
-      <div className="panel p-5 border-coral-400/40 bg-coral-500/5">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-coral-400" />
-          <h3 className="font-mono text-sm font-bold text-coral-400">
-            {isValidationError
-              ? 'Input Validation Warning'
-              : isApiKeyError
-              ? 'Gemini API Key Required'
-              : isModelError
-              ? 'Model Configuration Error'
-              : 'Feedback Pipeline Error'}
-          </h3>
-        </div>
-
-        <p className="text-sm mt-1 text-ink-800 dark:text-paper-100 font-medium">
-          {error}
-        </p>
-
-        <div className="mt-4 pt-3 border-t border-paper-200 dark:border-ink-700/60 text-xs text-ink-600 dark:text-paper-200/60 font-mono space-y-1">
-          <p className="font-bold text-amber-500 uppercase tracking-wider">Troubleshooting Steps:</p>
-          {isApiKeyError ? (
-            <ul className="list-disc list-inside space-y-0.5">
-              <li>Ensure you have set a valid key in <code className="text-amber-400">backend/.env</code> (<code className="text-ink-900 dark:text-paper-100">GEMINI_API_KEY=AIzaSy...</code>).</li>
-              <li>Or enable offline testing mode: set <code className="text-amber-400">DEMO_MODE=true</code> in <code className="text-ink-900 dark:text-paper-100">backend/.env</code>.</li>
-            </ul>
-          ) : isModelError ? (
-            <ul className="list-disc list-inside space-y-0.5">
-              <li>Check <code className="text-amber-400">GEMINI_MODEL</code> in <code className="text-ink-900 dark:text-paper-100">backend/.env</code>.</li>
-              <li>Recommended models: <code className="text-ink-900 dark:text-paper-100">gemini-2.0-flash</code> or <code className="text-ink-900 dark:text-paper-100">gemini-1.5-flash</code>.</li>
-            </ul>
-          ) : (
-            <ul className="list-disc list-inside space-y-0.5">
-              <li>Check your backend terminal console for the detailed Python traceback.</li>
-              <li>Ensure both problem statement and code are provided before submitting.</li>
-            </ul>
-          )}
-        </div>
-      </div>
-    )
-  }
-
   if (loading) {
     return (
       <div className="panel p-5">
@@ -71,6 +24,48 @@ export default function FeedbackPanel({ loading, result, error }) {
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-3 rounded bg-paper-200/70 dark:bg-ink-700/70 animate-pulse" style={{ width: `${90 - i * 12}%` }} />
           ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (error && !result) {
+    const isApiKeyError = error.includes('API_KEY') || error.includes('API key') || error.includes('401')
+    const isModelError = error.includes('model') || error.includes('404')
+    const isValidationError = error.includes('required') || error.includes('Missing') || error.includes('Please provide')
+
+    return (
+      <div className="panel p-5 border-coral-400/40 bg-coral-500/5">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-coral-400" />
+          <h3 className="font-mono text-sm font-bold text-coral-400">
+            {isValidationError
+              ? 'Input Validation Notice'
+              : isApiKeyError
+              ? 'Gemini API Key Notice'
+              : isModelError
+              ? 'Model Notice'
+              : 'Feedback Notice'}
+          </h3>
+        </div>
+
+        <p className="text-sm mt-1 text-ink-800 dark:text-paper-100 font-medium">
+          {error}
+        </p>
+
+        <div className="mt-4 pt-3 border-t border-paper-200 dark:border-ink-700/60 text-xs text-ink-600 dark:text-paper-200/60 font-mono space-y-1">
+          <p className="font-bold text-amber-500 uppercase tracking-wider">Troubleshooting Steps:</p>
+          {isApiKeyError ? (
+            <ul className="list-disc list-inside space-y-0.5">
+              <li>Add a valid key in <code className="text-amber-400">backend/.env</code> (<code className="text-ink-900 dark:text-paper-100">GEMINI_API_KEY=AIzaSy...</code>).</li>
+              <li>Or set <code className="text-amber-400">DEMO_MODE=true</code> in <code className="text-ink-900 dark:text-paper-100">backend/.env</code> for fast local evaluation.</li>
+            </ul>
+          ) : (
+            <ul className="list-disc list-inside space-y-0.5">
+              <li>Ensure both a problem statement and solution code are provided.</li>
+              <li>Check your backend terminal console for detailed diagnostic logs.</li>
+            </ul>
+          )}
         </div>
       </div>
     )

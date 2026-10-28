@@ -95,6 +95,23 @@ export default function Login({ theme, setTheme, onAuthed }) {
     }
   }
 
+  async function handleQuickDemoLogin(uname = 'test_dev') {
+    setError(null)
+    setSuccess(null)
+    setLoading(true)
+    try {
+      const data = await login(uname, 'Password123!')
+      setSuccess(`Signed in as ${data.display_name || uname}! Redirecting...`)
+      setTimeout(() => {
+        onAuthed(data.username)
+      }, 200)
+    } catch (err) {
+      setError(err.message || 'Demo login failed. Please check that the backend is running on port 8000.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function handleRegisterSubmit(e) {
     e.preventDefault()
     setError(null)
@@ -119,8 +136,8 @@ export default function Login({ theme, setTheme, onAuthed }) {
       return
     }
 
-    if (strengthScore < 5) {
-      setError('Password must meet all 5 complexity requirements.')
+    if (regPassword.length < 6) {
+      setError('Password must be at least 6 characters long.')
       return
     }
 
@@ -141,7 +158,7 @@ export default function Login({ theme, setTheme, onAuthed }) {
       setSuccess('Account created successfully! Welcome to DSA Coach.')
       setTimeout(() => {
         onAuthed(data.username)
-      }, 500)
+      }, 400)
     } catch (err) {
       setError(err.message || 'Failed to create account. Please check your details.')
     } finally {
@@ -283,7 +300,7 @@ export default function Login({ theme, setTheme, onAuthed }) {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full mt-2 py-3 rounded-xl font-mono font-bold text-sm bg-ink-900 text-amber-400 dark:bg-amber-400 dark:text-ink-950 hover:opacity-90 disabled:opacity-50 transition shadow-sm flex items-center justify-center gap-2"
+                  className="w-full mt-2 py-3 rounded-xl font-mono font-bold text-sm bg-ink-900 text-amber-400 dark:bg-amber-400 dark:text-ink-950 hover:opacity-90 disabled:opacity-50 transition shadow-sm flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {loading ? (
                     <>
@@ -294,6 +311,42 @@ export default function Login({ theme, setTheme, onAuthed }) {
                     <span>Sign In →</span>
                   )}
                 </button>
+
+                {/* Quick 1-Click Demo Login */}
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => handleQuickDemoLogin('test_dev')}
+                    className="w-full py-2.5 rounded-xl font-mono font-semibold text-xs border border-amber-500/40 bg-amber-400/10 text-amber-500 hover:bg-amber-400/20 transition flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <span>⚡ Quick 1-Click Demo Login (test_dev)</span>
+                  </button>
+                </div>
+
+                {/* Quick Credentials Helpers */}
+                <div className="p-3 rounded-xl bg-paper-100 dark:bg-ink-800/80 border border-paper-200 dark:border-ink-700 text-xs">
+                  <div className="flex items-center justify-between font-mono mb-1.5">
+                    <span className="font-semibold text-ink-600 dark:text-paper-200/70">Test Accounts</span>
+                    <span className="text-[10px] text-ink-600/60 dark:text-paper-200/40">Click to autofill</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setLoginIdentifier('test_dev'); setLoginPassword('Password123!'); }}
+                      className="px-2.5 py-1 rounded bg-white dark:bg-ink-700 border border-paper-200 dark:border-ink-600 font-mono text-[11px] text-ink-800 dark:text-paper-100 hover:text-amber-500 hover:border-amber-400 transition cursor-pointer"
+                    >
+                      test_dev
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setLoginIdentifier('arpitaa21'); setLoginPassword('Password123!'); }}
+                      className="px-2.5 py-1 rounded bg-white dark:bg-ink-700 border border-paper-200 dark:border-ink-600 font-mono text-[11px] text-ink-800 dark:text-paper-100 hover:text-amber-500 hover:border-amber-400 transition cursor-pointer"
+                    >
+                      arpitaa21
+                    </button>
+                  </div>
+                </div>
               </form>
             ) : (
               /* CREATE ACCOUNT FORM */

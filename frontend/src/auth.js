@@ -54,10 +54,31 @@ export function authHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
-async function parseOrThrow(res) {
+async function safeFetch(url, options = {}) {
+  try {
+    return await fetch(url, options)
+  } catch (err) {
+    const error = new Error(
+      'Cannot connect to the DSA Coach backend. Please ensure the FastAPI backend is running on http://127.0.0.1:8000.'
+    )
+    error.status = 503
+    throw error
+  }
+}
+
+async function parseOrThrow(res, endpoint = '') {
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
-    let message = data.detail || `Request failed with status ${res.status}`
+    let message = data.detail
+    if (!message) {
+      if (res.status === 404) {
+        message = `Backend server not reachable at ${endpoint || 'the API'} (HTTP 404). Please ensure the FastAPI backend is running on http://127.0.0.1:8000.`
+      } else if (res.status === 502 || res.status === 503 || res.status === 504) {
+        message = `Backend server is currently unavailable (HTTP ${res.status}). Please check that the server is running on port 8000.`
+      } else {
+        message = `Request failed with status ${res.status}`
+      }
+    }
     // If detail is an array (Pydantic validation errors)
     if (Array.isArray(data.detail)) {
       message = data.detail.map((d) => d.msg || JSON.stringify(d)).join(', ')
@@ -73,7 +94,7 @@ async function parseOrThrow(res) {
  * Log in with either username or email and password.
  */
 export async function login(identifier, password) {
-  const res = await fetch('/api/login', {
+  const res = await safeFetch('/api/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -81,7 +102,7 @@ export async function login(identifier, password) {
       password,
     }),
   })
-  const data = await parseOrThrow(res)
+  const data = await parseOrThrow(res, '/api/login')
   saveSession(data)
   return data
 }
@@ -90,7 +111,7 @@ export async function login(identifier, password) {
  * Register a new user with username, email, password, and optional display name.
  */
 export async function register({ username, email, password, displayName = '' }) {
-  const res = await fetch('/api/register', {
+  const res = await safeFetch('/api/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -100,7 +121,7 @@ export async function register({ username, email, password, displayName = '' }) 
       display_name: displayName.trim() || undefined,
     }),
   })
-  const data = await parseOrThrow(res)
+  const data = await parseOrThrow(res, '/api/register')
   saveSession(data)
   return data
 }
@@ -112,16 +133,20 @@ export async function fetchCurrentUser() {
   const token = getToken()
   if (!token) return null
 
-  const res = await fetch('/api/me', {
-    headers: { ...authHeaders() },
-  })
+  try {
+    const res = await safeFetch('/api/me', {
+      headers: { ...authHeaders() },
+    })
 
-  if (!res.ok) {
-    clearSession()
+    if (!res.ok) {
+      clearSession()
+      return null
+    }
+
+    const user = await res.json()
+    saveSession({ access_token: token, ...user })
+    return user
+  } catch {
     return null
   }
-
-  const user = await res.json()
-  saveSession({ access_token: token, ...user })
-  return user
 }

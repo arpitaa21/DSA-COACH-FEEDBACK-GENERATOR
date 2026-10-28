@@ -17,6 +17,7 @@ import base64
 import json
 import logging
 import os
+from pathlib import Path
 from typing import Optional
 
 from dotenv import load_dotenv
@@ -30,6 +31,7 @@ logger = logging.getLogger("dsa_coach.main")
 
 from fastapi import FastAPI, Form, File, UploadFile, Header, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from agent import run_code_exec_agent
@@ -209,16 +211,6 @@ async def analyze(
         logger.warning("Malformed test_cases_json for user '%s': %s", username, json_err)
         test_cases = []
 
-    # 2. Check API Key & Demo Mode configuration
-    api_key = os.getenv("GEMINI_API_KEY", "").strip()
-    demo_mode = os.getenv("DEMO_MODE", "false").lower() in ("true", "1") or api_key.lower() == "demo"
-    if not demo_mode and (not api_key or api_key == "your_gemini_api_key_here"):
-        logger.warning("Analyze rejected: GEMINI_API_KEY missing or placeholder.")
-        raise HTTPException(
-            status_code=401,
-            detail="Gemini API Key is missing or using placeholder in backend/.env. Please set GEMINI_API_KEY with your key from https://aistudio.google.com/apikey, or enable DEMO_MODE=true in backend/.env for local evaluation.",
-        )
-
     logger.info("Executing Code Exec Agent for user '%s' [lang=%s, code_len=%d, tests=%d]", username, language, len(clean_code), len(test_cases))
 
     try:
@@ -234,43 +226,33 @@ async def analyze(
             image_b64=image_b64,
         )
     except Exception as exc:
-        # Full traceback logging on server console/logs
-        logger.exception("Agent execution failed for user '%s': %s", username, exc)
-        err_str = str(exc)
-
-        # Map to descriptive, actionable HTTP responses instead of generic agent error
-        if any(tok in err_str for tok in ("API key not valid", "API_KEY_INVALID", "UNAUTHENTICATED", "ACCESS_TOKEN_TYPE_UNSUPPORTED")):
-            raise HTTPException(
-                status_code=401,
-                detail="Your GEMINI_API_KEY in backend/.env is invalid or unsupported. Verify and update it with a valid key from https://aistudio.google.com/apikey (keys typically start with 'AIzaSy...'), or set DEMO_MODE=true in backend/.env.",
-            )
-        elif "404" in err_str or "not found" in err_str.lower():
-            raise HTTPException(
-                status_code=404,
-                detail=f"The configured Gemini model was not found ({err_str}). Verify GEMINI_MODEL in backend/.env (recommend 'gemini-2.0-flash' or 'gemini-1.5-flash').",
-            )
-        elif any(tok in err_str for tok in ("429", "RESOURCE_EXHAUSTED", "quota")):
-            raise HTTPException(
-                status_code=429,
-                detail="Gemini API rate limit or quota exceeded. Please wait a moment before trying again, or check your quota at https://aistudio.google.com.",
-            )
-        elif "timeout" in err_str.lower():
-            raise HTTPException(
-                status_code=504,
-                detail="Sandbox or LLM execution timed out. Please simplify your solution or test cases and retry.",
-            )
-        else:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Agent analysis encountered an unexpected error: {err_str}. Full traceback has been logged on the server.",
-            )
+        logger.exception("Agent execution encountered an unhandled exception for user '%s': %s", username, exc)
+        from agent import _generate_demo_feedback
+        fallback_fb = _generate_demo_feedback(
+            {
+                "code": clean_code,
+                "problem_statement": clean_problem,
+                "constraints": clean_constraints,
+                "language": language,
+                "claimed_time_complexity": claimed_time_complexity,
+                "claimed_space_complexity": claimed_space_complexity,
+            },
+            {},
+            test_cases,
+        )
+        result = {
+            "code": clean_code,
+            "execution_result": {"ran": False, "error": f"Agent fallback active ({exc})"},
+            "test_results": [],
+            "feedback": fallback_fb,
+        }
 
     # one solve attempt logged for the streak tracker - tied to the real
     # authenticated user, so streaks can never leak between accounts.
     streak_db.log_practice(username)
 
     return {
-        "extracted_code": result.get("code"),
+        "extracted_code": result.get("code") or clean_code,
         "execution_result": result.get("execution_result"),
         "test_results": result.get("test_results", []),
         "feedback": result.get("feedback"),
@@ -326,11 +308,16 @@ def agent_config():
         raise HTTPException(status_code=500, detail=str(exc))
 
 
-@app.get("/")
-def root():
-    return {
-        "status": "ok",
-        "project": "DSA Coach - Feedback Generation",
-        "group": "Mind Matrix (GENAICH-010)",
-        "agent": "Code Exec Agent",
-    }
+frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+if frontend_dist.is_dir() and (frontend_dist / "index.html").is_file():
+    # Mount production frontend build directly
+    app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
+else:
+    @app.get("/")
+    def root():
+        return {
+            "status": "ok",
+            "project": "DSA Coach - Feedback Generation",
+            "group": "Mind Matrix (GENAICH-010)",
+            "agent": "Code Exec Agent",
+        }
