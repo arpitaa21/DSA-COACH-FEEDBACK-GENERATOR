@@ -7,19 +7,7 @@
   ],
   "routes": [
     {
-      "src": "/api/register",
-      "dest": "main.py"
-    },
-    {
-      "src": "/api/login",
-      "dest": "main.py"
-    },
-    {
       "src": "/api/languages",
-      "dest": "main.py"
-    },
-    {
-      "src": "/api/streak",
       "dest": "main.py"
     },
     {

@@ -127,6 +127,15 @@ http://localhost:4173. Both commands select `backend/venv` when it exists and
 reuse an already-running backend on port 8000. The `/api` proxy is configured
 in `frontend/vite.config.js`.
 
+### Separate Vercel deployments
+
+This repository is deployed as two Vercel projects: the frontend project rooted
+at `frontend/` and the API project rooted at `backend/`. Set
+`VITE_API_BASE_URL` in the frontend project's Production environment to
+`https://dsa-coach-feedback-generator-api.vercel.app/api`. The backend project
+must allow public production requests so the dashboard can call it. Redeploy the
+frontend after changing this setting.
+
 If you prefer separate terminals, start the backend with
 `uvicorn main:app --reload --host 127.0.0.1 --port 8000` from `backend`, then run
 the frontend command. A proxy `ECONNREFUSED 127.0.0.1:8000` means the backend
