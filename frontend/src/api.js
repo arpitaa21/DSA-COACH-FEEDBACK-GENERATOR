@@ -1,19 +1,7 @@
-import { authHeaders } from './auth.js'
-
 const BASE = '/api'
 
 export async function fetchLanguages() {
   const res = await fetch(`${BASE}/languages`)
-  return res.json()
-}
-
-export async function fetchStreak() {
-  const res = await fetch(`${BASE}/streak`, { headers: { ...authHeaders() } })
-  if (!res.ok) {
-    const err = new Error('Could not load your streak - please log in again.')
-    err.status = res.status
-    throw err
-  }
   return res.json()
 }
 
@@ -35,7 +23,6 @@ export async function analyzeSubmission({
   const res = await fetch(`${BASE}/analyze`, {
     method: 'POST',
     body: form,
-    headers: { ...authHeaders() },
   })
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))

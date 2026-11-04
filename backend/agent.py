@@ -896,6 +896,39 @@ def generate_feedback_node(state: AgentState) -> AgentState:
 # ---------------------------------------------------------------------------
 # Graph Construction & Sequential Fallback
 # ---------------------------------------------------------------------------
+def _emergency_feedback() -> dict:
+    """Return schema-valid feedback if both the graph and fallback reviewer fail."""
+    message = (
+        "The analysis pipeline encountered an internal error. Your submission was received, "
+        "but a complete code review could not be produced. Please retry in a moment."
+    )
+    return DSAFeedback(
+        verdict="partially_correct",
+        score=0,
+        one_line_summary=message,
+        improvement_areas={
+            "correctness": message,
+            "edge_cases": [],
+            "readability": "No readability assessment is available for this attempt.",
+        },
+        pattern_insight={
+            "pattern_name": "Review unavailable",
+            "why_pattern_applies": "The review pipeline stopped before it could identify the problem pattern.",
+            "key_clues": [],
+        },
+        optimization_approach={
+            "actual_time_complexity": "Unknown",
+            "actual_space_complexity": "Unknown",
+            "complexity_verdict": "unknown",
+            "complexity_notes": "Complexity could not be assessed for this attempt.",
+            "optimal_approach": "Retry the analysis to receive an optimization recommendation.",
+            "optimal_time_complexity": "Unknown",
+            "optimal_space_complexity": "Unknown",
+        },
+        correctness_notes=message,
+    ).model_dump()
+
+
 async def _run_sequential(state: AgentState) -> AgentState:
     """Fallback runner if LangGraph is not installed or encounters runtime C-extension issues."""
     state = read_input(state)
@@ -934,7 +967,21 @@ async def run_code_exec_agent(**kwargs) -> AgentState:
         try:
             return await code_exec_agent.ainvoke(initial_state)
         except Exception as exc:
-            logger.warning("LangGraph ainvoke failed (%s), running sequential fallback.", exc)
-            return await _run_sequential(initial_state)
-    else:
+            logger.exception("LangGraph execution failed; running sequential fallback: %s", exc)
+
+    try:
         return await _run_sequential(initial_state)
+    except Exception as exc:
+        logger.exception("Sequential agent fallback failed: %s", exc)
+        state = dict(initial_state)
+        state.setdefault("execution_result", {
+            "ran": False,
+            "stdout": "",
+            "stderr": "",
+            "compile_stderr": None,
+            "signal": None,
+            "error": "The execution/review pipeline encountered an internal error.",
+        })
+        state.setdefault("test_results", [])
+        state["feedback"] = _emergency_feedback()
+        return state

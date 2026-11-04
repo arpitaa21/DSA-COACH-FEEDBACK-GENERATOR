@@ -274,12 +274,13 @@ export default function FeedbackPanel({ loading, result, error }) {
       )}
 
       {/* Sandbox Output */}
-      {(exec.stdout || exec.stderr || exec.compile_stderr) && (
+      {(exec.stdout || exec.stderr || exec.compile_stderr || exec.error) && (
         <div className="panel overflow-hidden">
           <p className="text-xs font-mono uppercase tracking-wider px-4 sm:px-5 pt-3.5 sm:pt-4 text-ink-600 dark:text-paper-200/50 font-bold">
             Sandbox execution log
           </p>
           <pre className="text-xs font-mono p-3.5 sm:p-5 overflow-x-auto scrollbar-thin whitespace-pre-wrap">
+            {exec.error && <span className="text-amber-500">{exec.error}\n</span>}
             {exec.compile_stderr && <span className="text-coral-400">{exec.compile_stderr}\n</span>}
             {exec.stdout}
             {exec.stderr && <span className="text-coral-400">{exec.stderr}</span>}

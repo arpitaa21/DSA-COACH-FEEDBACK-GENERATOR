@@ -38,7 +38,6 @@ User submits ──▶ │  1. read_input        (Gemini Vision OCR) │
  code/image      └─────────────────────────────────────────┘         │
                                                                         ▼
                                                               React feedback panel
-                                                            + daily streak heatmap
 ```
 
 - **`read_input`** — if the user uploaded an image instead of typing code, Gemini's
@@ -57,15 +56,13 @@ User submits ──▶ │  1. read_input        (Gemini Vision OCR) │
 ```
 dsa-coach-mindmatrix/
 ├── backend/
-│   ├── main.py          # FastAPI app: /api/analyze, /api/streak, /api/languages, /api/rag/*
+│   ├── main.py          # FastAPI app: /api/analyze, /api/languages, /api/rag/*
 │   ├── agent.py          # Code Exec Agent (LangGraph + Gemini)
 │   ├── piston_client.py  # multi-language sandbox execution (Judge0 default, Piston secondary)
-│   ├── auth.py            # username/password auth (bcrypt + JWT)
 │   ├── config/
 │   │   ├── agents.yaml     # agent persona: role / goal / backstory (CrewAI-style)
 │   │   └── tools.yaml       # tool config: sandbox provider, vision model, RAG settings + data-source manifest
 │   ├── config_loader.py   # loads + validates agents.yaml and tools.yaml
-│   ├── streak_db.py       # SQLite daily-practice tracker
 │   ├── rag/                # RAG ingestion/indexing pipeline (see "RAG module" below)
 │   │   ├── loaders.py, chunking.py, embeddings.py, indexing.py
 │   │   ├── ingestion.py, evaluation.py
@@ -83,7 +80,7 @@ dsa-coach-mindmatrix/
     │   └── components/
     │       ├── Header.jsx, ThemeToggle.jsx
     │       ├── ProblemForm.jsx, CodeEditor.jsx, ImageUpload.jsx
-    │       ├── FeedbackPanel.jsx, StreakTracker.jsx
+    │       ├── FeedbackPanel.jsx
     ├── tailwind.config.js
     └── package.json
 ```
@@ -93,14 +90,29 @@ dsa-coach-mindmatrix/
 ### 1. Get a Gemini API key
 Create one free at https://aistudio.google.com/apikey
 
-### 2. Backend
+### 2. Backend setup
+
+For a fresh setup, create the environment and install dependencies:
+
 ```bash
 cd backend
-python -m venv venv && source venv/bin/activate   # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env        # then paste your GEMINI_API_KEY into .env
-uvicorn main:app --reload --port 8000
+python -m venv venv
 ```
+
+```powershell
+# Windows
+.\venv\Scripts\python.exe -m pip install -r requirements.txt
+Copy-Item .env.example .env
+```
+
+```bash
+# macOS / Linux
+source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+Add your `GEMINI_API_KEY` to `backend/.env`.
 
 ### 3. Frontend
 ```bash
@@ -108,52 +120,40 @@ cd frontend
 npm install
 npm run dev
 ```
-Open http://localhost:5173 — the Vite dev server proxies `/api` to the backend on
-port 8000 (see `vite.config.js`).
+`npm run dev` starts both the backend and Vite, then opens the dashboard at
+http://localhost:5173. `npm run preview` also starts both services (the frontend
+must be built first with `npm run build`) and serves the dashboard at
+http://localhost:4173. Both commands select `backend/venv` when it exists and
+reuse an already-running backend on port 8000. The `/api` proxy is configured
+in `frontend/vite.config.js`.
+
+If you prefer separate terminals, start the backend with
+`uvicorn main:app --reload --host 127.0.0.1 --port 8000` from `backend`, then run
+the frontend command. A proxy `ECONNREFUSED 127.0.0.1:8000` means the backend
+isn't running or didn't finish starting; check its terminal output.
 
 ## Features
 
-0. **Login / sign up** — a real account system (username + password, bcrypt-hashed,
-   JWT session tokens). Every solve and every streak box is tied to the logged-in
-   user's own account, `backend/auth.py` + `backend/main.py` (`/api/register`,
-   `/api/login`) + `frontend/src/components/Login.jsx`. No one can see or extend
-   another user's streak.
-1. **Upload a photo of your code** (or paste a file's contents) — Gemini Vision reads
+1. **No account required** — open the dashboard and submit a problem statement,
+   constraints, and code to get feedback.
+2. **Problem-focused coaching** — get correctness checks, edge cases, a different
+   way to think about the problem, and optimization suggestions.
+3. **Upload a photo of your code** (or paste a file's contents) — Gemini Vision reads
    handwritten notes, IDE screenshots, or notebook photos.
-2. **12+ languages** — Python, Java, C, C++, JavaScript, TypeScript, Go, Rust, C#,
+4. **12+ languages** — Python, Java, C, C++, JavaScript, TypeScript, Go, Rust, C#,
    Ruby, Kotlin, Swift, real-executed via Piston.
-3. **Genuine feedback, not flattery** — actual vs. claimed Big-O, missed edge cases,
+5. **Genuine feedback, not flattery** — actual vs. claimed Big-O, missed edge cases,
    real bugs from the sandbox run, and concrete "how to improve" steps.
-3.5. **Real test-case verification** — add input → expected-output pairs
+6. **Real test-case verification** — add input → expected-output pairs
    (`frontend/src/components/TestCases.jsx`); the Code Exec Agent runs your code
    against every one of them in the Piston sandbox and reports actual PASS/FAIL,
    not a guess. If any case fails, the verdict is forced to `partially_correct` or
    `incorrect` — Gemini is not allowed to call it "correct" on vibes
    (`backend/agent.py`, `execute_code_node` + the verdict rule in `FEEDBACK_PROMPT`).
-4. **Light + dark theme**, toggle persisted in `localStorage`.
-5. **Daily practice streak, tracked correctly per user** — a GitHub/LeetCode-style
-   green heatmap. Every `/api/analyze` call is authenticated (JWT bearer token), so
-   the backend always knows exactly whose solve to log — `streak_db.log_practice(username)`
-   uses the username decoded from the token, never a value the client can spoof.
-   The heatmap and current-streak count (`/api/streak`) are likewise scoped to the
-   logged-in user only.
-6. **Problem-first UI** — problem statement, constraints, and your claimed
+7. **Light + dark theme**, toggle persisted in `localStorage`.
+8. **Problem-first UI** — problem statement, constraints, and your claimed
    time/space complexity sit right next to the editor, so the agent always reviews
    your code *against the actual problem*, not in a vacuum.
-
-## Auth flow
-
-1. `POST /api/register` (username, password) or `POST /api/login` returns
-   `{ access_token, username }`. Passwords are bcrypt-hashed in `backend/users.db`,
-   never stored in plaintext.
-2. The frontend stores the token in `localStorage` (`frontend/src/auth.js`) and
-   attaches `Authorization: Bearer <token>` to every `/api/analyze` and `/api/streak`
-   call.
-3. `get_current_username()` in `backend/main.py` decodes the JWT on every protected
-   request — the username used to log a streak or fetch a heatmap always comes from
-   the verified token, never from a form field the client could edit.
-4. Logging out (`Header.jsx`) just clears the local token; the session naturally
-   expires after 7 days either way (`TOKEN_EXPIRY_SECONDS` in `backend/auth.py`).
 
 ## Agent config (`backend/config/agents.yaml`)
 
@@ -248,8 +248,6 @@ retrieval happening, and it's currently only exercised by `evaluation.py`.
   no card needed) — see `backend/.env.example` for how to get a key. Piston is kept
   as a secondary option (`CODE_EXECUTOR=piston`), but as of Feb 2026 its free public
   API requires an authorized key from the maintainer, so it won't work out of the box.
-- `streaks.db` and `users.db` are local SQLite files for demo purposes — swap for
-  Postgres/Mongo for multi-user production deployments.
-- Set a real `JWT_SECRET` in `.env` before deploying anywhere public — the default
-  in `.env.example` is for local development only.
+- The dashboard and analysis API do not require an account. Submissions are processed
+  without a user profile or account-based history.
 # DSA-COACH-FEEDBACK-GENERATOR

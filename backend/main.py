@@ -6,17 +6,14 @@ Group: Mind Matrix (GENAICH-010)
 Agent: Code Exec Agent (LLM + sandbox tool) - powered by Gemini
 
 FastAPI app exposing:
-  POST /api/register, /api/login  -> username/password auth
   POST /api/analyze               -> run the Code Exec Agent, optionally against
                                        real test cases (input -> expected output)
-  GET  /api/streak                -> the logged-in user's daily-practice heatmap
   GET  /api/languages             -> supported languages for the editor dropdown
 """
 
 import base64
 import json
 import logging
-import os
 from pathlib import Path
 from typing import Optional
 
@@ -29,15 +26,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger("dsa_coach.main")
 
-from fastapi import FastAPI, Form, File, UploadFile, Header, HTTPException, Depends
+from fastapi import FastAPI, Form, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
 
-from agent import run_code_exec_agent
+from agent import _emergency_feedback, run_code_exec_agent
 from piston_client import LANGUAGE_MAP
-import streak_db
-import auth
 from config_loader import load_agent_config, load_tools_config
 
 app = FastAPI(title="DSA Coach - Feedback Generation API")
@@ -50,110 +44,9 @@ app.add_middleware(
 )
 
 
-# ---------------------------------------------------------------------------
-# Auth: every streak / analyze call is tied to a real logged-in user, taken
-# from the JWT, never from a client-supplied username field. This is what
-# makes the daily-practice streak track correctly per person.
-# ---------------------------------------------------------------------------
-class RegisterRequest(BaseModel):
-    username: str
-    email: str
-    password: str
-    display_name: Optional[str] = None
-
-
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-
-class AuthResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    username: str
-    email: str
-    display_name: str
-
-
-class UserProfileResponse(BaseModel):
-    username: str
-    email: str
-    display_name: str
-
-
-async def get_current_username(authorization: Optional[str] = Header(None)) -> str:
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Not authenticated. Please log in.")
-    token = authorization.split(" ", 1)[1]
-    payload = auth.decode_access_token(token)
-    if not payload or not payload.get("sub"):
-        raise HTTPException(status_code=401, detail="Session expired. Please log in again.")
-    return payload["sub"]
-
-
-@app.post("/api/register", response_model=AuthResponse)
-def register(payload: RegisterRequest):
-    try:
-        user = auth.create_user(
-            username=payload.username,
-            email=payload.email,
-            password=payload.password,
-            display_name=payload.display_name,
-        )
-    except auth.AuthError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-    token = auth.create_access_token(user)
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "username": user["username"],
-        "email": user["email"],
-        "display_name": user["display_name"],
-    }
-
-
-@app.post("/api/login", response_model=AuthResponse)
-def login(payload: LoginRequest):
-    try:
-        user = auth.verify_user(payload.username, payload.password)
-    except auth.AuthError as exc:
-        raise HTTPException(status_code=401, detail=str(exc))
-    token = auth.create_access_token(user)
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "username": user["username"],
-        "email": user["email"],
-        "display_name": user["display_name"],
-    }
-
-
-@app.get("/api/me", response_model=UserProfileResponse)
-def get_me(username: str = Depends(get_current_username)):
-    user = auth.get_user_by_username(username)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found.")
-    return user
-
-
 @app.get("/api/languages")
 def languages():
     return {"languages": sorted(LANGUAGE_MAP.keys())}
-
-
-class StreakResponse(BaseModel):
-    username: str
-    current_streak: int
-    heatmap: list
-
-
-@app.get("/api/streak", response_model=StreakResponse)
-def get_streak(username: str = Depends(get_current_username)):
-    return {
-        "username": username,
-        "current_streak": streak_db.get_current_streak(username),
-        "heatmap": streak_db.get_heatmap(username),
-    }
 
 
 @app.post("/api/analyze")
@@ -167,7 +60,6 @@ async def analyze(
     stdin: str = Form(""),
     test_cases_json: str = Form("[]"),
     image: Optional[UploadFile] = File(None),
-    username: str = Depends(get_current_username),
 ):
     # 1. UI Input Validation - catch empty/malformed inputs before hitting the agent
     clean_code = code.strip()
@@ -175,21 +67,21 @@ async def analyze(
     clean_constraints = constraints.strip()
 
     if not clean_code and image is None:
-        logger.warning("Analyze rejected for user '%s': no code or image submitted.", username)
+        logger.warning("Analyze rejected: no code or image submitted.")
         raise HTTPException(
             status_code=400,
             detail="Code solution is required. Please type your code in the editor or upload an image.",
         )
 
     if not clean_problem:
-        logger.warning("Analyze rejected for user '%s': empty problem statement.", username)
+        logger.warning("Analyze rejected: empty problem statement.")
         raise HTTPException(
             status_code=400,
             detail="Problem statement is required so the coach can evaluate your solution's correctness.",
         )
 
     if not clean_constraints:
-        logger.info("User '%s' submitted without explicit constraints.", username)
+        logger.info("Submission received without explicit constraints.")
 
     image_b64 = None
     if image is not None:
@@ -197,7 +89,7 @@ async def analyze(
             raw = await image.read()
             image_b64 = base64.b64encode(raw).decode("utf-8")
         except Exception as img_err:
-            logger.error("Failed to read uploaded image for user '%s': %s", username, img_err)
+            logger.error("Failed to read uploaded image: %s", img_err)
             raise HTTPException(
                 status_code=400,
                 detail=f"Uploaded image could not be processed: {img_err}",
@@ -208,10 +100,10 @@ async def analyze(
         if not isinstance(test_cases, list):
             test_cases = []
     except json.JSONDecodeError as json_err:
-        logger.warning("Malformed test_cases_json for user '%s': %s", username, json_err)
+        logger.warning("Malformed test_cases_json: %s", json_err)
         test_cases = []
 
-    logger.info("Executing Code Exec Agent for user '%s' [lang=%s, code_len=%d, tests=%d]", username, language, len(clean_code), len(test_cases))
+    logger.info("Executing Code Exec Agent [lang=%s, code_len=%d, tests=%d]", language, len(clean_code), len(test_cases))
 
     try:
         result = await run_code_exec_agent(
@@ -226,20 +118,24 @@ async def analyze(
             image_b64=image_b64,
         )
     except Exception as exc:
-        logger.exception("Agent execution encountered an unhandled exception for user '%s': %s", username, exc)
-        from agent import _generate_demo_feedback
-        fallback_fb = _generate_demo_feedback(
-            {
-                "code": clean_code,
-                "problem_statement": clean_problem,
-                "constraints": clean_constraints,
-                "language": language,
-                "claimed_time_complexity": claimed_time_complexity,
-                "claimed_space_complexity": claimed_space_complexity,
-            },
-            {},
-            test_cases,
-        )
+        logger.exception("Agent execution encountered an unhandled exception: %s", exc)
+        try:
+            from agent import _generate_demo_feedback
+            fallback_fb = _generate_demo_feedback(
+                {
+                    "code": clean_code,
+                    "problem_statement": clean_problem,
+                    "constraints": clean_constraints,
+                    "language": language,
+                    "claimed_time_complexity": claimed_time_complexity,
+                    "claimed_space_complexity": claimed_space_complexity,
+                },
+                {},
+                test_cases,
+            )
+        except Exception as fallback_exc:
+            logger.exception("Static feedback fallback also failed: %s", fallback_exc)
+            fallback_fb = _emergency_feedback()
         result = {
             "code": clean_code,
             "execution_result": {"ran": False, "error": f"Agent fallback active ({exc})"},
@@ -247,15 +143,18 @@ async def analyze(
             "feedback": fallback_fb,
         }
 
-    # one solve attempt logged for the streak tracker - tied to the real
-    # authenticated user, so streaks can never leak between accounts.
-    streak_db.log_practice(username)
+    if not isinstance(result, dict):
+        logger.error("Agent returned an invalid response type: %s", type(result).__name__)
+        result = {}
 
     return {
         "extracted_code": result.get("code") or clean_code,
-        "execution_result": result.get("execution_result"),
-        "test_results": result.get("test_results", []),
-        "feedback": result.get("feedback"),
+        "execution_result": result.get("execution_result") or {
+            "ran": False,
+            "error": "The code execution result was unavailable.",
+        },
+        "test_results": result.get("test_results") or [],
+        "feedback": result.get("feedback") or _emergency_feedback(),
     }
 
 

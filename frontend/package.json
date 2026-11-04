@@ -4,9 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node run-local.mjs dev",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "node run-local.mjs preview"
   },
   "dependencies": {
     "react": "^18.3.1",
